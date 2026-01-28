@@ -38,7 +38,7 @@ export function launchBot() {
         setTimeout(() => launchBot(), 2000)
       })
       return
-    } catch (e) {
+    } catch (_e: unknown) {
       console.warn('⚠️ Ошибка проверки существующего бота, останавливаем и перезапускаем')
       shutdownBot()
     }
@@ -72,7 +72,7 @@ export function launchBot() {
     launched = false
     
     // Если 409 конфликт - пытаемся остановить старый инстанс
-    if (errorMessage?.includes('409') || errorMessage?.includes('Conflict')) {
+    if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
       console.log('🔄 Обнаружен конфликт (409), останавливаем старый инстанс и пробуем снова через 5 секунд...')
       shutdownBot()
       setTimeout(() => {
