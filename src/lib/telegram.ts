@@ -25,7 +25,7 @@ type TelegramError = {
 
 // Получаем экземпляр бота из telegram-init (без создания нового с polling)
 // Если бот не инициализирован, создаём временный экземпляр только для отправки сообщений (без polling)
-const getBot = (): TelegramBot | null => {
+const getBot = (): InstanceType<typeof TelegramBot> | null => {
   const mainBot = getBotInstance();
   if (mainBot) {
     return mainBot;
