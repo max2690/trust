@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { nanoid } from 'nanoid'
 import QRCode from 'qrcode'
 import type { UserRole } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 export interface CreateOrderData {
   title: string
@@ -187,7 +188,7 @@ export async function createOrderInDB(data: {
       deadline: data.deadline,
       campaignType: data.campaignType as 'SINGLE' | 'WEEKLY' | 'BIWEEKLY',
       totalQuantity: data.totalQuantity,
-      dailySchedule: data.dailySchedule ?? undefined,
+      dailySchedule: (data.dailySchedule ?? undefined) as Prisma.InputJsonValue | undefined,
       autoDistribution: data.autoDistribution,
       refundOnFailure: data.refundOnFailure,
       refundDeadline: data.refundDeadline,
@@ -268,7 +269,7 @@ export async function createOrder(orderData: CreateOrderData) {
       deadline: deadlineDate,
       campaignType: orderData.campaignType || 'SINGLE',
       totalQuantity: quantity > 1 ? quantity : (orderData.totalQuantity || 1),
-      dailySchedule: quantity > 1 ? undefined : (orderData.dailyDistribution || undefined),
+      dailySchedule: (quantity > 1 ? undefined : (orderData.dailyDistribution || undefined)) as Prisma.InputJsonValue | undefined,
       autoDistribution: orderData.autoDistribution ?? true,
       refundOnFailure: orderData.refundOnFailure ?? true,
       refundDeadline: orderData.refundDeadline
