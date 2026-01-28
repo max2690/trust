@@ -117,7 +117,8 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public - раскомментировано, чтобы видео и статические файлы попадали в репозиторий
+# public
 
 # Storybook build outputs
 .out

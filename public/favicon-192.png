@@ -1,0 +1,28 @@
+﻿<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Фон -->
+  <rect width="192" height="192" rx="48" fill="#0B0B0F"/>
+  
+  <!-- сновной символ MB -->
+  <path d="M48 60h24v72h-12v-48h-12v48H48V60z" fill="#00D4FF"/>
+  <path d="M84 60h24v72h-12v-48h-12v48h-12V60z" fill="#00E1B4"/>
+  
+  <!-- ополнительные элементы -->
+  <circle cx="132" cy="72" r="12" fill="#00D4FF" opacity="0.8"/>
+  <circle cx="156" cy="96" r="9" fill="#00E1B4" opacity="0.6"/>
+  <circle cx="144" cy="120" r="6" fill="#00D4FF" opacity="0.4"/>
+  
+  <!-- Точки доверия -->
+  <circle cx="36" cy="36" r="6" fill="#00E1B4" opacity="0.7"/>
+  <circle cx="156" cy="36" r="6" fill="#00D4FF" opacity="0.7"/>
+  <circle cx="36" cy="156" r="6" fill="#00D4FF" opacity="0.7"/>
+  <circle cx="156" cy="156" r="6" fill="#00E1B4" opacity="0.7"/>
+  
+  <!-- радиентный эффект -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00D4FF;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#00E1B4;stop-opacity:0.1" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="48" fill="url(#grad1)"/>
+</svg>
