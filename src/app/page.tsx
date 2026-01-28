@@ -3,8 +3,9 @@ import Link from "next/link";
 import Image from "next/image";
 import HeroButtons from "@/components/HeroButtons";
 import HowItWorksTrigger from "@/components/HowItWorksTrigger";
-import TakeTaskButton from "@/components/TakeTaskButton";
+import TakeTaskButton from "@/components/CreateTaskButton";
 import CreateTaskButton from "@/components/CreateTaskButton";
+import HeroVideo from "@/components/HeroVideo";
 
 export const metadata: Metadata = {
   title: "MB-Trust — первый доверительный маркетинг",
@@ -41,28 +42,7 @@ export default function Landing() {
       {/* HERO */}
       <section className="flex overflow-hidden relative items-center min-h-screen border-b border-gray-200 border-white/5 dark:border-white/5">
         {/* Фоновое видео */}
-        <div className="absolute inset-0 z-0">
-          <video
-            className="object-cover absolute inset-0 w-full h-full opacity-30"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            poster="/videos/poster.jpg"
-            onError={(e) => {
-              console.error('Ошибка загрузки видео:', e);
-              // Скрываем видео при ошибке
-              const video = e.currentTarget;
-              video.style.display = 'none';
-            }}
-          >
-            <source src="/videos/mb-trust-hero-video.mp4" type="video/mp4" />
-            Ваш браузер не поддерживает видео.
-          </video>
-          {/* Overlay для затемнения */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0F]/80 via-[#0B0B0F]/60 to-[#0B0B0F]/80"></div>
-        </div>
+        <HeroVideo />
 
         <div className="relative z-10 px-4 py-16 mx-auto w-full max-w-6xl sm:px-6 sm:py-24">
           <div className="flex flex-col gap-6 items-center text-center">
