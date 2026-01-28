@@ -174,8 +174,8 @@ export default function CustomerDashboardPage() {
     )
   }
   
-  // Если не авторизован (не должно произойти из-за useSession required)
-  if (status === 'unauthenticated') {
+  // useSession({ required: true }) гарантирует, что status === 'authenticated' здесь
+  if (!session?.user) {
     return null
   }
 
