@@ -48,9 +48,17 @@ export default function Landing() {
             muted
             loop
             playsInline
+            preload="auto"
             poster="/videos/poster.jpg"
+            onError={(e) => {
+              console.error('Ошибка загрузки видео:', e);
+              // Скрываем видео при ошибке
+              const video = e.currentTarget;
+              video.style.display = 'none';
+            }}
           >
             <source src="/videos/mb-trust-hero-video.mp4" type="video/mp4" />
+            Ваш браузер не поддерживает видео.
           </video>
           {/* Overlay для затемнения */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0F]/80 via-[#0B0B0F]/60 to-[#0B0B0F]/80"></div>
