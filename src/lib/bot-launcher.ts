@@ -105,8 +105,9 @@ function startHealthCheck() {
       .then(() => {
         console.log('✅ Health check: бот работает')
       })
-      .catch((error) => {
-        console.error('❌ Health check: бот не отвечает:', error.message)
+      .catch((error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        console.error('❌ Health check: бот не отвечает:', errorMessage)
         console.log('🔄 Перезапускаем бота...')
         shutdownBot()
         launched = false
