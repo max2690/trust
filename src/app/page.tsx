@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import HeroButtons from "@/components/HeroButtons";
 import HowItWorksTrigger from "@/components/HowItWorksTrigger";
-import TakeTaskButton from "@/components/CreateTaskButton";
+import TakeTaskButton from "@/components/TakeTaskButton";
 import CreateTaskButton from "@/components/CreateTaskButton";
 import HeroVideo from "@/components/HeroVideo";
 
