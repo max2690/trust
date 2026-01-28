@@ -7,10 +7,11 @@ import { Send, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface TelegramVerificationProps {
   userId: string
+  signupToken?: string | null
   onVerified?: () => void
 }
 
-export function TelegramVerification({ userId, onVerified }: TelegramVerificationProps) {
+export function TelegramVerification({ userId, signupToken, onVerified }: TelegramVerificationProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'pending' | 'completed' | 'error'>('idle')
   const [code, setCode] = useState<string | null>(null)
   const [deepLink, setDeepLink] = useState<string | null>(null)
@@ -48,7 +49,11 @@ export function TelegramVerification({ userId, onVerified }: TelegramVerificatio
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/users?userId=${userId}`)
+        const params = new URLSearchParams({ userId })
+        if (signupToken) {
+          params.set('signupToken', signupToken)
+        }
+        const res = await fetch(`/api/users?${params.toString()}`)
         const data = await res.json()
 
         // Проверяем разные возможные форматы ответа
@@ -65,7 +70,7 @@ export function TelegramVerification({ userId, onVerified }: TelegramVerificatio
     }, 2000) // Проверяем каждые 2 секунды
 
     return () => clearInterval(interval)
-  }, [status, userId, onVerified])
+  }, [status, userId, signupToken, onVerified])
 
   if (status === 'completed') {
     return (

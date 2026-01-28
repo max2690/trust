@@ -47,7 +47,7 @@ export default function QuickAccessPage() {
           <div className="space-y-2">
             <h3 className="text-lg font-semibold text-white">👥 Пользовательские панели:</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Link href="/customer/dashboard" passHref>
+              <Link href="/dashboard/customer" passHref>
                 <Button className="w-full h-16 text-lg border border-mb-turquoise/30 hover:border-mb-turquoise/70 shadow-lg shadow-mb-turquoise/10 hover:shadow-glow" variant="outline">
                   <div className="text-center">
                     <div className="text-2xl mb-1">👤</div>

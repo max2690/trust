@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Container from '@/components/ui/container';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ type OrderItem = { id: string; executions?: ExecItem[] } & Record<string, unknow
 export default function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [order, setOrder] = useState<OrderItem | null>(null);
   const [executions, setExecutions] = useState<ExecItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,8 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
     const fetchOrder = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/orders');
+        // Для безопасности запрашиваем только доступные задания для исполнителя
+        const res = await fetch('/api/orders?role=executor', { cache: 'no-store' });
         const data = await res.json();
         if (data.success && Array.isArray(data.orders)) {
           const found = data.orders.find((o: OrderItem) => o.id === id);

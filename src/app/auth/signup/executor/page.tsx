@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,9 +22,25 @@ export default function ExecutorSignUpPage() {
     confirmPassword: ''
   })
   const [userId, setUserId] = useState<string | null>(null)
+  const [signupToken, setSignupToken] = useState<string | null>(null)
   const [isRegistered, setIsRegistered] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Восстанавливаем userId из sessionStorage при загрузке страницы
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUserId = sessionStorage.getItem('signup_userId')
+      const savedToken = savedUserId ? sessionStorage.getItem(`signup_token_${savedUserId}`) : null
+      if (savedUserId) {
+        setUserId(savedUserId)
+        setIsRegistered(true)
+        if (savedToken) {
+          setSignupToken(savedToken)
+        }
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,7 +71,18 @@ export default function ExecutorSignUpPage() {
       }
 
       setUserId(data.user.id)
+      setSignupToken(data.signupToken || null)
       setIsRegistered(true)
+      
+      // Сохраняем userId и пароль в sessionStorage для автологина после верификации
+      // Важно: очистим после успешного логина
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('signup_userId', data.user.id)
+        sessionStorage.setItem(`signup_password_${data.user.id}`, formData.password)
+        if (data.signupToken) {
+          sessionStorage.setItem(`signup_token_${data.user.id}`, data.signupToken)
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка регистрации')
     } finally {
@@ -63,32 +91,81 @@ export default function ExecutorSignUpPage() {
   }
 
   const handleVerified = async () => {
-    // После верификации перенаправляем на правильный дашборд
-    if (userId) {
-      try {
-        const res = await fetch(`/api/users?userId=${userId}`)
-        const data = await res.json()
-        
-        if (data.success && data.user) {
-          // Проверяем роль и перенаправляем
-          if (data.user.role === 'EXECUTOR') {
-            router.push('/executor/available')
-          } else if (data.user.role === 'CUSTOMER') {
-            router.push('/dashboard/customer')
-          } else {
-            router.push('/auth/signin')
-          }
-          return
-        }
-      } catch (error) {
-        console.error('Ошибка получения информации о пользователе:', error)
-      }
+    if (!userId) {
+      router.push('/auth/signin')
+      return
     }
     
-    // Fallback - перенаправляем на дашборд исполнителя по умолчанию
-    setTimeout(() => {
-      router.push('/executor/available')
-    }, 2000)
+    try {
+      console.log('[SIGNUP] Верификация завершена, выполняем автологин для пользователя:', userId)
+      
+      // 1. Получаем данные пользователя из БД
+      const signupTokenValue = typeof window !== 'undefined'
+        ? sessionStorage.getItem(`signup_token_${userId}`) || signupToken || ''
+        : signupToken || ''
+
+      const params = new URLSearchParams({ userId })
+      if (signupTokenValue) {
+        params.set('signupToken', signupTokenValue)
+      }
+
+      const res = await fetch(`/api/users?${params.toString()}`)
+      const data = await res.json()
+      
+      if (!data.success || !data.user) {
+        console.error('[SIGNUP] Не удалось получить данные пользователя')
+        router.push('/auth/signin')
+        return
+      }
+      
+      console.log('[SIGNUP] Данные пользователя получены:', data.user.phone, data.user.role)
+      
+      // 2. Получаем пароль из sessionStorage или из формы (fallback)
+      const password = typeof window !== 'undefined' 
+        ? sessionStorage.getItem(`signup_password_${userId}`) || formData.password
+        : formData.password
+      
+      if (!password) {
+        console.error('[SIGNUP] Пароль не найден, требуется повторный вход')
+        router.push('/auth/signin?error=password_missing')
+        return
+      }
+      
+      // 3. АВТОЛОГИН через NextAuth
+      const result = await signIn('credentials', {
+        phone: data.user.phone,
+        password: password,
+        redirect: false
+      })
+      
+      // Очищаем пароль и userId из sessionStorage после успешного логина
+      if (typeof window !== 'undefined' && result?.ok) {
+        sessionStorage.removeItem(`signup_password_${userId}`)
+        sessionStorage.removeItem('signup_userId')
+        sessionStorage.removeItem(`signup_token_${userId}`)
+        setSignupToken(null)
+      }
+      
+      if (result?.error) {
+        console.error('[SIGNUP] Ошибка автологина:', result.error)
+        router.push('/auth/signin?error=autologin_failed')
+        return
+      }
+      
+      console.log('[SIGNUP] Автологин успешен, перенаправляем на дашборд')
+      
+      // 3. Перенаправляем на правильный дашборд
+      if (data.user.role === 'EXECUTOR') {
+        router.push('/executor/available')
+      } else if (data.user.role === 'CUSTOMER') {
+        router.push('/dashboard/customer')
+      } else {
+        router.push('/auth/signin')
+      }
+    } catch (error) {
+      console.error('[SIGNUP] Критическая ошибка автологина:', error)
+      router.push('/auth/signin')
+    }
   }
   return (
     <div className="min-h-screen bg-mb-black text-mb-white flex items-center justify-center p-4">
@@ -129,7 +206,7 @@ export default function ExecutorSignUpPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isRegistered && userId ? (
-              <TelegramVerification userId={userId} onVerified={handleVerified} />
+              <TelegramVerification userId={userId} signupToken={signupToken} onVerified={handleVerified} />
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (

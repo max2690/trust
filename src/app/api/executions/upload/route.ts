@@ -3,20 +3,35 @@ import { nanoid } from 'nanoid';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    // КРИТИЧНО: Берём executorId из сессии, а не из formData
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { id?: string; role?: string } | undefined;
+
+    if (!sessionUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (sessionUser.role !== 'EXECUTOR') {
+      return NextResponse.json({ error: 'Только исполнители могут загружать скриншоты' }, { status: 403 });
+    }
+
+    const executorId = sessionUser.id; // Безопасно: из сессии, не из formData
+
     const formData = await request.formData();
     // Поддерживаем оба названия для совместимости
     const screenshotFile = (formData.get('file') || formData.get('screenshot')) as File;
     const orderId = formData.get('orderId') as string;
-    const executorId = formData.get('executorId') as string;
     
-    if (!screenshotFile || !orderId || !executorId) {
-      return NextResponse.json({ error: 'Файл, ID заказа или ID исполнителя не найдены' }, { status: 400 });
+    if (!screenshotFile || !orderId) {
+      return NextResponse.json({ error: 'Файл или ID заказа не найдены' }, { status: 400 });
     }
 
     // Проверка типа файла
@@ -29,16 +44,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Размер файла не должен превышать 10MB' }, { status: 400 });
     }
 
-    // Проверяем, что выполнение существует
+    // Проверяем, что выполнение существует И принадлежит текущему исполнителю
     const execution = await prisma.execution.findFirst({
       where: {
         orderId,
-        executorId
+        executorId // Теперь безопасно: executorId из сессии
       }
     });
 
     if (!execution) {
-      return NextResponse.json({ error: 'Выполнение не найдено' }, { status: 404 });
+      return NextResponse.json({ error: 'Выполнение не найдено или у вас нет прав на загрузку' }, { status: 404 });
     }
 
     // Создаем папку для скриншотов если её нет

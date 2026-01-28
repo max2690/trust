@@ -2,21 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { OrderCard } from "@/components/business/OrderCard";
 import { Card, CardContent } from "@/components/ui/card";
-import { Target, Filter } from "lucide-react";
+import { Target, Filter, ArrowUpDown, Clock, DollarSign, Calendar } from "lucide-react";
 import { ExecutorNav } from "@/components/layout/ExecutorNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-import type { OrderUI } from "@/lib/ui-types";
+import type { OrderUI } from "@/lib/types";
 
 export default function AvailablePage() {
+  const router = useRouter();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/auth/signin?role=executor')
+    },
+  });
+  
   const [orders, setOrders] = useState<OrderUI[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterNetwork, setFilterNetwork] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"newest" | "reward" | "deadline">("newest");
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'error'} | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     if (notification) {
@@ -25,29 +34,44 @@ export default function AvailablePage() {
     }
   }, [notification]);
 
+  // Проверка роли
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/orders?role=executor", { cache: "no-store" });
-        const data = await res.json();
-        setOrders(data.orders ?? []);
-      } catch (error) {
-        console.error("Ошибка загрузки заказов:", error);
-        setNotification({ message: 'Ошибка загрузки доступных заданий', type: 'error' });
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (status === 'authenticated' && session?.user?.role !== 'EXECUTOR') {
+      console.warn('[EXECUTOR] Пользователь не является исполнителем, редирект')
+      router.push('/auth/signin')
+    }
+  }, [status, session, router])
+
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.id) {
+      (async () => {
+        try {
+          const res = await fetch("/api/orders?role=executor", { cache: "no-store" });
+          const data = await res.json();
+          setOrders(data.orders ?? []);
+        } catch (error) {
+          console.error("Ошибка загрузки заказов:", error);
+          setNotification({ message: 'Ошибка загрузки доступных заданий', type: 'error' });
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [status, session]);
 
   const handleAccept = async (orderId: string) => {
+    if (!session?.user?.id) {
+      setNotification({ message: 'Ошибка: не авторизован', type: 'error' });
+      return;
+    }
+    
     try {
       const r = await fetch("/api/executions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           orderId, 
-          executorId: 'test-executor-1' // TODO: брать из сессии
+          executorId: session.user.id // Используем реальный userId из сессии
         }),
       });
       
@@ -67,12 +91,18 @@ export default function AvailablePage() {
     }
   };
 
-  if (loading) {
+  // Показываем загрузку пока проверяется сессия
+  if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-mb-black flex items-center justify-center">
         <div className="text-white text-xl">Загрузка…</div>
       </div>
     );
+  }
+  
+  // Если не авторизован
+  if (status === 'unauthenticated') {
+    return null;
   }
 
   return (
@@ -97,28 +127,61 @@ export default function AvailablePage() {
           )}
         </div>
 
-        {/* Фильтр по социальным сетям */}
+        {/* Фильтры и сортировка */}
         {orders.length > 0 && (
-          <div className="mb-6 flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-mb-gray" />
-            <span className="text-sm text-mb-gray">Фильтр:</span>
-            <Button
-              variant={filterNetwork === "all" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setFilterNetwork("all")}
-            >
-              Все
-            </Button>
-            {Array.from(new Set(orders.map((o) => o.socialNetwork))).map((network) => (
+          <div className="mb-6 space-y-4">
+            {/* Фильтр по социальным сетям */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-mb-gray" />
+              <span className="text-sm text-mb-gray">Фильтр:</span>
               <Button
-                key={network}
-                variant={filterNetwork === network ? "default" : "ghost"}
+                variant={filterNetwork === "all" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => setFilterNetwork(network || "all")}
+                onClick={() => setFilterNetwork("all")}
               >
-                {network}
+                Все
               </Button>
-            ))}
+              {Array.from(new Set(orders.map((o) => o.socialNetwork))).map((network) => (
+                <Button
+                  key={network}
+                  variant={filterNetwork === network ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setFilterNetwork(network || "all")}
+                >
+                  {network}
+                </Button>
+              ))}
+            </div>
+
+            {/* Сортировка */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <ArrowUpDown className="h-4 w-4 text-mb-gray" />
+              <span className="text-sm text-mb-gray">Сортировка:</span>
+              <Button
+                variant={sortBy === "newest" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setSortBy("newest")}
+              >
+                <Calendar className="h-3 w-3 mr-1" />
+                Новые
+              </Button>
+              <Button
+                variant={sortBy === "reward" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setSortBy("reward")}
+              >
+                <DollarSign className="h-3 w-3 mr-1" />
+                По награде
+              </Button>
+              <Button
+                variant={sortBy === "deadline" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setSortBy("deadline")}
+              >
+                <Clock className="h-3 w-3 mr-1" />
+                По дедлайну
+              </Button>
+            </div>
           </div>
         )}
         
@@ -133,22 +196,74 @@ export default function AvailablePage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {(filterNetwork === "all" 
-              ? orders 
-              : orders.filter((o) => o.socialNetwork === filterNetwork)
-            ).map((o) => (
-              <OrderCard key={o.id} order={o} onAccept={handleAccept} />
-            ))}
-            {filterNetwork !== "all" && 
-             orders.filter((o) => o.socialNetwork === filterNetwork).length === 0 && (
-              <Card className="border-0 shadow-lg text-center py-8">
-                <CardContent>
-                  <p className="text-mb-gray">Нет заданий для выбранной социальной сети</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          <>
+            {/* Функция сортировки */}
+            {(() => {
+              const filteredOrders = filterNetwork === "all" 
+                ? orders 
+                : orders.filter((o) => o.socialNetwork === filterNetwork);
+              
+              const sortedOrders = [...filteredOrders].sort((a, b) => {
+                switch (sortBy) {
+                  case "reward":
+                    return (Number(b.totalReward ?? b.reward ?? 0)) - (Number(a.totalReward ?? a.reward ?? 0));
+                  case "deadline":
+                    if (!a.deadline && !b.deadline) return 0;
+                    if (!a.deadline) return 1;
+                    if (!b.deadline) return -1;
+                    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                  case "newest":
+                  default:
+                    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                }
+              });
+
+              return (
+                <>
+                  {/* Desktop и Tablet версия - сетка */}
+                  <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                    {sortedOrders.map((o) => (
+                      <OrderCard key={o.id} order={o} onAccept={handleAccept} compact />
+                    ))}
+                  </div>
+
+                  {/* Mobile версия - горизонтальный свайп */}
+                  <div className="sm:hidden overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
+                    <div className="flex gap-4" style={{ width: 'max-content' }}>
+                      {sortedOrders.map((o) => (
+                        <div key={o.id} className="w-[85vw] max-w-[340px] flex-shrink-0">
+                          <OrderCard order={o} onAccept={handleAccept} compact />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Индикатор свайпа на мобильных */}
+                  {sortedOrders.length > 1 && (
+                    <div className="sm:hidden flex justify-center gap-1.5 mt-4">
+                      {sortedOrders.slice(0, 5).map((_, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-mb-turquoise' : 'bg-mb-gray/30'}`} 
+                        />
+                      ))}
+                      {sortedOrders.length > 5 && (
+                        <span className="text-xs text-mb-gray ml-1">+{sortedOrders.length - 5}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {sortedOrders.length === 0 && filterNetwork !== "all" && (
+                    <Card className="border-0 shadow-lg text-center py-8">
+                      <CardContent>
+                        <p className="text-mb-gray">Нет заданий для выбранной социальной сети</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
+          </>
         )}
       </div>
     </div>

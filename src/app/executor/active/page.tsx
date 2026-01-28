@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { OrderCard } from "@/components/business/OrderCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock } from "lucide-react";
@@ -23,6 +25,14 @@ interface Execution {
 }
 
 export default function ActivePage() {
+  const router = useRouter();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/auth/signin?role=executor')
+    },
+  });
+  
   const [execs, setExecs] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -36,27 +46,34 @@ export default function ActivePage() {
   }, [notification]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        // Загружаем все выполнения, фильтруем активные на клиенте
-        const res = await fetch("/api/executions?executorId=test-executor-1", { cache: "no-store" });
-        const data = await res.json();
-        // Фильтруем только активные (IN_PROGRESS, PENDING, UPLOADED, PENDING_REVIEW)
-        const activeStatuses = ['IN_PROGRESS', 'PENDING', 'UPLOADED', 'PENDING_REVIEW'];
-        const activeExecs = (data.executions ?? []).filter((e: Execution) => 
-          activeStatuses.includes(e.status)
-        );
-        setExecs(activeExecs);
-      } catch (error) {
-        console.error("Ошибка загрузки выполнений:", error);
-        setNotification({ message: 'Ошибка загрузки активных заданий', type: 'error' });
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (status === 'authenticated' && session?.user?.id) {
+      (async () => {
+        try {
+          // Загружаем выполнения текущего пользователя
+          const res = await fetch("/api/executions", { cache: "no-store" });
+          const data = await res.json();
+          // Фильтруем только активные (IN_PROGRESS, PENDING, UPLOADED, PENDING_REVIEW)
+          const activeStatuses = ['IN_PROGRESS', 'PENDING', 'UPLOADED', 'PENDING_REVIEW'];
+          const activeExecs = (data.executions ?? []).filter((e: Execution) => 
+            activeStatuses.includes(e.status)
+          );
+          setExecs(activeExecs);
+        } catch (error) {
+          console.error("Ошибка загрузки выполнений:", error);
+          setNotification({ message: 'Ошибка загрузки активных заданий', type: 'error' });
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [status, session]);
 
   const upload = async (file: File, orderId: string) => {
+    if (!session?.user?.id) {
+      setNotification({ message: 'Ошибка: не авторизован', type: 'error' });
+      return;
+    }
+
     // Проверка типа файла
     if (!file.type.startsWith('image/')) {
       setNotification({ message: 'Пожалуйста, загрузите изображение', type: 'error' });
@@ -73,7 +90,7 @@ export default function ActivePage() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("orderId", orderId);
-    fd.append("executorId", "test-executor-1"); // TODO: из сессии
+    // Примечание: executorId теперь берётся из сессии на сервере
     
     try {
       const r = await fetch("/api/executions/upload", { method: "POST", body: fd });
@@ -81,7 +98,7 @@ export default function ActivePage() {
         const data = await r.json();
         setNotification({ message: 'Скриншот загружен! Идет автоматическая проверка...', type: 'success' });
         // Обновляем данные вместо полной перезагрузки
-        const refreshRes = await fetch("/api/executions?executorId=test-executor-1", { cache: "no-store" });
+        const refreshRes = await fetch("/api/executions", { cache: "no-store" });
         const refreshData = await refreshRes.json();
         const activeStatuses = ['IN_PROGRESS', 'PENDING', 'UPLOADED', 'PENDING_REVIEW'];
         const activeExecs = (refreshData.executions ?? []).filter((e: Execution) => 
@@ -100,12 +117,16 @@ export default function ActivePage() {
     }
   };
 
-  if (loading) {
+  if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-mb-black flex items-center justify-center">
         <div className="text-white text-xl">Загрузка…</div>
       </div>
     );
+  }
+  
+  if (status === 'unauthenticated') {
+    return null;
   }
 
   return (

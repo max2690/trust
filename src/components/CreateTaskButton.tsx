@@ -9,8 +9,8 @@ export default function CreateTaskButton() {
 
   const go = () => {
     const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
-    if (!userId) router.push('/auth/signin?role=business');
-    else router.push('/customer/dashboard');
+    if (!userId) router.push('/auth/signin?role=customer');
+    else router.push('/dashboard/customer');
   };
 
   return (

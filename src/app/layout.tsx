@@ -5,10 +5,19 @@ import { Header } from "@/components/header";
 import AppSessionProvider from "@/components/SessionProvider";
 
 // Инициализация Telegram бота (только на сервере)
+// Используем динамический импорт для избежания проблем при сборке
 if (typeof window === 'undefined') {
-  import('@/lib/telegram-init-server').catch(err => {
-    console.error('Ошибка загрузки Telegram бота:', err);
-  });
+  // Проверяем, что это не время сборки
+  const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                      process.env.NEXT_PHASE === 'phase-development-build' ||
+                      process.env.npm_lifecycle_event === 'build'
+  
+  if (!isBuildTime) {
+    // Импортируем при реальном запуске сервера
+    import('@/lib/telegram-init-server').catch(err => {
+      console.error('Ошибка загрузки Telegram бота:', err);
+    });
+  }
 }
 
 const manrope = Manrope({

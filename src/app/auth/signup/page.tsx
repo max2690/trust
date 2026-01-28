@@ -1,14 +1,14 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Users, DollarSign } from 'lucide-react'
 
-export default function SignUpPage() {
+function SignUpForm() {
   const router = useRouter()
   const sp = useSearchParams()
 
@@ -115,5 +115,17 @@ export default function SignUpPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-mb-black text-mb-white flex items-center justify-center">
+        <div className="text-mb-gray">Загрузка...</div>
+      </div>
+    }>
+      <SignUpForm />
+    </Suspense>
   )
 }

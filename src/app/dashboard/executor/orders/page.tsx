@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,17 +29,25 @@ interface OrderWithReward extends Order {
 
 export default function AvailableOrdersPage() {
   const router = useRouter()
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/auth/signin?role=executor')
+    },
+  })
   const [orders, setOrders] = useState<OrderWithReward[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
-    fetchOrders()
-  }, [])
+    if (status === 'authenticated') {
+      fetchOrders()
+    }
+  }, [status])
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch('/api/orders?status=PENDING')
+      const response = await fetch('/api/orders?role=executor', { cache: 'no-store' })
       const result = await response.json()
       
       if (result.success) {
@@ -52,6 +61,11 @@ export default function AvailableOrdersPage() {
   }
 
   const takeOrder = async (orderId: string) => {
+    if (!session?.user?.id) {
+      alert('Ошибка: не авторизован');
+      return;
+    }
+
     try {
       const response = await fetch('/api/executions', {
         method: 'POST',
@@ -60,7 +74,7 @@ export default function AvailableOrdersPage() {
         },
         body: JSON.stringify({
           orderId,
-          executorId: 'test-executor-1', // Используем ID тестового исполнителя из create-test-accounts.mjs
+          // executorId берётся из сессии на сервере
           description: 'Взял задание в работу'
         }),
       })
@@ -108,29 +122,6 @@ export default function AvailableOrdersPage() {
 
   return (
     <div className="min-h-screen bg-mb-black text-mb-white">
-      {/* Header */}
-      <header className="border-b border-mb-gray/20 bg-mb-black/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Назад
-            </Button>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-mb-turquoise to-mb-gold rounded-lg flex items-center justify-center mb-text-glow">
-                <span className="text-mb-black font-bold text-sm">MB</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-mb-turquoise to-mb-gold bg-clip-text text-transparent">
-                MB-TRUST
-              </span>
-            </div>
-          </div>
-          <Badge variant="gold" className="text-sm">
-            Исполнитель
-          </Badge>
-        </div>
-      </header>
-
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Доступные задания</h1>

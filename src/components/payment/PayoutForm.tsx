@@ -72,7 +72,6 @@ export function PayoutForm({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 'temp-executor-1', // TODO: Из сессии
           amount: amount,
           method: selectedMethod
         })

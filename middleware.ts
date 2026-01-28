@@ -7,6 +7,8 @@ import type { NextRequest } from 'next/server';
 const ROLE_PATHS = [
   { prefix: '/executor', roles: ['EXECUTOR'] },
   { prefix: '/business', roles: ['CUSTOMER'] },
+  { prefix: '/dashboard/customer', roles: ['CUSTOMER'] },
+  { prefix: '/dashboard/executor', roles: ['EXECUTOR'] },
   { prefix: '/admin', roles: ['MODERATOR_ADMIN', 'SUPER_ADMIN'] },
 ];
 

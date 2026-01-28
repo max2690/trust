@@ -1,19 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { RefundStatus, ExecutionStatus, OrderStatus, PaymentStatus } from '@prisma/client';
+import { RefundStatus, ExecutionStatus, OrderStatus, PaymentStatus, UserRole } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { id?: string; role?: UserRole } | undefined;
+
+    if (!sessionUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const isAdmin = sessionUser.role === 'SUPER_ADMIN' || sessionUser.role === 'MODERATOR_ADMIN';
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const customerId = searchParams.get('customerId');
 
     const where: { status?: RefundStatus; customerId?: string } = {};
     if (status) where.status = status as RefundStatus;
-    if (customerId) where.customerId = customerId;
+    if (isAdmin) {
+      if (customerId) where.customerId = customerId;
+    } else if (sessionUser.role === 'CUSTOMER') {
+      where.customerId = sessionUser.id!;
+    } else {
+      return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
+    }
 
     const refunds = await prisma.refund.findMany({
       where,
@@ -45,12 +61,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { orderId, customerId, reason = 'Невыполнение заказа в срок' } = body;
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { id?: string; role?: UserRole } | undefined;
 
-    if (!orderId || !customerId) {
+    if (!sessionUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (sessionUser.role !== 'CUSTOMER') {
+      return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { orderId, reason = 'Невыполнение заказа в срок' } = body;
+
+    if (!orderId) {
       return NextResponse.json({ error: 'Не все поля заполнены' }, { status: 400 });
     }
+    const customerId = sessionUser.id;
 
     // Получаем заказ
     const order = await prisma.order.findUnique({
@@ -117,6 +145,18 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { id?: string; role?: UserRole } | undefined;
+
+    if (!sessionUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const isAdmin = sessionUser.role === 'SUPER_ADMIN' || sessionUser.role === 'MODERATOR_ADMIN';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { refundId, status, processedAt } = body;
 

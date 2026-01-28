@@ -31,10 +31,12 @@ const levels = [
 export default function Landing() {
   return (
     <main className="min-h-screen bg-[#0B0B0F] text-[#F2F2F2]">
-      {/* Санити-тест */}
-      <div className="p-6 mb-4 font-semibold text-center text-black bg-emerald-500 rounded-2xl">
-        Tailwind работает ✔
-      </div>
+      {/* Санити-тест — показывать только в development */}
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="p-6 mb-4 font-semibold text-center text-black bg-emerald-500 rounded-2xl">
+          Tailwind работает ✔
+        </div>
+      )}
       
       {/* HERO */}
       <section className="flex overflow-hidden relative items-center min-h-screen border-b border-gray-200 border-white/5 dark:border-white/5">

@@ -12,7 +12,7 @@ export default function PaymentSuccessPage() {
   useEffect(() => {
     // Автоматически перенаправляем через 5 секунд
     const timer = setTimeout(() => {
-      router.push('/customer/dashboard');
+      router.push('/dashboard/customer');
     }, 5000);
 
     return () => clearTimeout(timer);
@@ -33,7 +33,7 @@ export default function PaymentSuccessPage() {
           </p>
           <div className="space-y-2">
             <Button 
-              onClick={() => router.push('/customer/dashboard')}
+              onClick={() => router.push('/dashboard/customer')}
               className="w-full"
             >
               Перейти в личный кабинет

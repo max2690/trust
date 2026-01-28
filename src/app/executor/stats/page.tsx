@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { ExecutorNav } from "@/components/layout/ExecutorNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { DollarSign, Target, CheckCircle, TrendingUp } from "lucide-react";
@@ -13,6 +15,14 @@ interface Stats {
 }
 
 export default function StatsPage() {
+  const router = useRouter();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/auth/signin?role=executor')
+    },
+  });
+  
   const [stats, setStats] = useState<Stats>({
     totalEarnings: 0,
     activeTasks: 0,
@@ -22,40 +32,46 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      try {
-        // Загружаем выполнения для расчета статистики
-        const res = await fetch("/api/executions?executorId=test-executor-1", { cache: "no-store" });
-        const data = await res.json();
-        
-        type Exec = { status: string; reward?: number };
-        const executions: Exec[] = (data.executions || []) as Exec[];
-        const completed = executions.filter((e: Exec) => e.status === "COMPLETED");
-        const active = executions.filter((e: Exec) => 
-          ['IN_PROGRESS', 'PENDING', 'UPLOADED', 'PENDING_REVIEW'].includes(e.status)
-        );
-        const totalEarnings = completed.reduce((sum: number, e: Exec) => sum + (e.reward || 0), 0);
-        
-        setStats({
-          totalEarnings,
-          activeTasks: active.length,
-          completedTasks: completed.length,
-          rating: completed.length > 0 ? 4.8 : 0, // TODO: реальный рейтинг
-        });
-      } catch (error) {
-        console.error("Ошибка загрузки статистики:", error);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (status === 'authenticated' && session?.user?.id) {
+      (async () => {
+        try {
+          // Загружаем выполнения для расчета статистики
+          const res = await fetch("/api/executions", { cache: "no-store" });
+          const data = await res.json();
+          
+          type Exec = { status: string; reward?: number };
+          const executions: Exec[] = (data.executions || []) as Exec[];
+          const completed = executions.filter((e: Exec) => e.status === "COMPLETED" || e.status === "APPROVED");
+          const active = executions.filter((e: Exec) => 
+            ['IN_PROGRESS', 'PENDING', 'UPLOADED', 'PENDING_REVIEW'].includes(e.status)
+          );
+          const totalEarnings = completed.reduce((sum: number, e: Exec) => sum + (e.reward || 0), 0);
+          
+          setStats({
+            totalEarnings,
+            activeTasks: active.length,
+            completedTasks: completed.length,
+            rating: completed.length > 0 ? 4.8 : 0, // TODO: реальный рейтинг
+          });
+        } catch (error) {
+          console.error("Ошибка загрузки статистики:", error);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [status, session]);
 
-  if (loading) {
+  if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-mb-black flex items-center justify-center">
         <div className="text-white text-xl">Загрузка…</div>
       </div>
     );
+  }
+  
+  if (status === 'unauthenticated') {
+    return null;
   }
 
   return (

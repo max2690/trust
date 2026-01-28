@@ -1,21 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { nanoid } from 'nanoid';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { ExecutionStatus, OrderStatus, UserRole } from '@prisma/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { orderId, executorId, screenshotUrl, notes } = body;
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { id?: string; role?: UserRole } | undefined;
 
-    // Валидация
-    if (!orderId || !executorId) {
+    if (!sessionUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (sessionUser.role !== 'EXECUTOR') {
+      return NextResponse.json({ error: 'Только исполнители могут брать задания' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { orderId, screenshotUrl, notes } = body;
+    const executorId = sessionUser.id;
+
+    if (!orderId) {
       return NextResponse.json({ error: 'Не все поля заполнены' }, { status: 400 });
     }
 
-    // Получаем информацию об исполнителе
     const executor = await prisma.user.findUnique({
       where: { id: executorId },
       select: { 
@@ -30,7 +43,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Исполнитель не найден' }, { status: 404 });
     }
 
-    // Проверяем, что заказ существует и доступен
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -44,16 +56,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
     }
 
-    // Проверяем, что исполнитель не брал этот заказ ранее
     if (order.executions.length > 0) {
       return NextResponse.json({ error: 'Вы уже взяли этот заказ' }, { status: 400 });
     }
 
-    if (order.status !== 'PENDING') {
+    if (order.status !== OrderStatus.PENDING) {
       return NextResponse.json({ error: 'Заказ уже принят' }, { status: 400 });
     }
 
-    // Проверяем дневные лимиты
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -66,7 +76,6 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Лимиты по уровням
     const levelLimits: Record<string, number> = {
       NOVICE: 5,
       VERIFIED: 10,
@@ -83,10 +92,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Проверяем лимиты по площадкам
     const platformLimits = (dailyLimit?.platformLimits as Record<string, number> | undefined) || {};
     const currentPlatformExecutions = platformLimits[order.socialNetwork] || 0;
-    const maxPlatformExecutions = 3; // Максимум 3 заказа на одну площадку в день
+    const maxPlatformExecutions = 3;
 
     if (currentPlatformExecutions >= maxPlatformExecutions) {
       return NextResponse.json({ 
@@ -94,7 +102,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Создаем выполнение
     const execution = await prisma.execution.create({
       data: {
         id: nanoid(),
@@ -102,18 +109,28 @@ export async function POST(request: NextRequest) {
         executorId,
         screenshotUrl: screenshotUrl || '',
         notes: notes || '',
-        status: 'PENDING',
+        status: ExecutionStatus.PENDING,
         reward: order.reward
       }
     });
 
-    // Обновляем статус заказа
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'IN_PROGRESS' }
+    // Проверяем, сколько исполнителей уже взяли задание
+    const totalExecutions = await prisma.execution.count({
+      where: { orderId }
     });
 
-    // Обновляем дневные лимиты
+    // Меняем статус на IN_PROGRESS только если это первый исполнитель
+    // Если quantity > 1, заказ остаётся PENDING для других исполнителей
+    if (totalExecutions === 1) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.IN_PROGRESS }
+      });
+    }
+    
+    // Если все слоты заполнены (например, quantity=10, и это 10-й исполнитель)
+    // НЕ переводим сразу в COMPLETED, это делается только после проверки скриншотов
+
     const newPlatformLimits = {
       ...platformLimits,
       [order.socialNetwork]: currentPlatformExecutions + 1
@@ -148,35 +165,26 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { id?: string; role?: UserRole } | undefined;
+
+    if (!sessionUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
-    const executorId = searchParams.get('executorId');
     const orderId = searchParams.get('orderId');
-    const status = searchParams.get('status');
-    const me = searchParams.get('me');
+    const status = searchParams.get('status') as ExecutionStatus | null;
+    const isAdmin = sessionUser.role === 'SUPER_ADMIN' || sessionUser.role === 'MODERATOR_ADMIN';
 
-    const where: { executorId?: string; orderId?: string; status?: 'PENDING' | 'UPLOADED' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'COMPLETED' } = {};
-    
-    // Если me=1, используем текущего пользователя (TODO: брать из сессии)
-    if (me && me === '1') {
-      // Заглушка для тестирования
-      where.executorId = 'test-executor-1';
-    } else if (executorId) {
-      where.executorId = executorId;
-    }
-    
-    if (orderId) {
-      where.orderId = orderId;
-    }
-    
-    if (status) {
-      where.status = status as typeof where.status;
-    }
+    if (sessionUser.role === 'EXECUTOR') {
+      const where: { executorId: string; status?: ExecutionStatus; orderId?: string } = {
+        executorId: sessionUser.id
+      };
+      if (status) where.status = status;
+      if (orderId) where.orderId = orderId;
 
-    let executions;
-
-    if (where.executorId || me === '1') {
-      // Выполнения конкретного исполнителя
-      executions = await prisma.execution.findMany({
+      const executions = await prisma.execution.findMany({
         where,
         include: {
           order: {
@@ -191,13 +199,27 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        orderBy: {
-          createdAt: 'desc'
-        }
+        orderBy: { createdAt: 'desc' }
       });
-    } else if (orderId) {
-      // Выполнения конкретного заказа
-      executions = await prisma.execution.findMany({
+
+      return NextResponse.json({ executions, success: true });
+    }
+
+    if (sessionUser.role === 'CUSTOMER') {
+      if (!orderId) {
+        return NextResponse.json({ error: 'orderId обязателен' }, { status: 400 });
+      }
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { customerId: true }
+      });
+
+      if (!order || order.customerId !== sessionUser.id) {
+        return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
+      }
+
+      const executions = await prisma.execution.findMany({
         where: { orderId },
         include: {
           executor: {
@@ -207,13 +229,19 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        orderBy: {
-          createdAt: 'desc'
-        }
+        orderBy: { createdAt: 'desc' }
       });
-    } else {
-      // Все выполнения (для админа)
-      executions = await prisma.execution.findMany({
+
+      return NextResponse.json({ executions, success: true });
+    }
+
+    if (isAdmin) {
+      const where: { orderId?: string; status?: ExecutionStatus } = {};
+      if (orderId) where.orderId = orderId;
+      if (status) where.status = status;
+
+      const executions = await prisma.execution.findMany({
+        where,
         include: {
           order: {
             select: {
@@ -230,13 +258,13 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        orderBy: {
-          createdAt: 'desc'
-        }
+        orderBy: { createdAt: 'desc' }
       });
+
+      return NextResponse.json({ executions, success: true });
     }
 
-    return NextResponse.json({ executions, success: true });
+    return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
     
   } catch (error) {
     console.error('Ошибка получения выполнений:', error);

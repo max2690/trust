@@ -1,0 +1,49 @@
+[Unit]
+Description=MB Trust Next.js App with Bot Auto-Start and Watchdog
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/mb-trust
+EnvironmentFile=/var/www/mb-trust/.env.local
+Environment=NODE_ENV=production
+
+# Основная команда запуска
+ExecStart=/usr/bin/npm start -- -p 3000
+
+# Автоматический запуск бота через 3 секунды после старта
+ExecStartPost=/bin/sleep 3
+ExecStartPost=/usr/bin/curl -s http://localhost:3000/api/health
+
+# Graceful stop
+ExecStop=/bin/kill -SIGTERM $MAINPID
+TimeoutStopSec=10
+
+# Автоматический перезапуск при сбоях
+Restart=always
+RestartSec=5
+
+# Ограничения (опционально, для безопасности)
+# LimitNOFILE=65536
+# MemoryLimit=2G
+
+# Пользователь и группа
+User=www-data
+Group=www-data
+
+# Watchdog: перезапуск если процесс зависнет (опционально)
+# WatchdogSec=60
+
+# Логирование
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mb-trust
+
+# Security hardening (опционально)
+# NoNewPrivileges=true
+# PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

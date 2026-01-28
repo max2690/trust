@@ -1,0 +1,9 @@
+open sftp://root:99RFG9J7AhjP@109.69.58.185:22
+cd /var/www/mb-trust
+put src/components/header.tsx src/components/header.tsx
+put src/app/api/users/route.ts src/app/api/users/route.ts
+put src/app/dashboard/customer/page.tsx src/app/dashboard/customer/page.tsx
+put src/app/customer/dashboard/page.tsx src/app/customer/dashboard/page.tsx
+close
+exit
+

@@ -1,4 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
+import { getBotInstance } from './telegram-init';
 
 // Типы для Telegram Bot API
 type TelegramMessage = {
@@ -22,11 +23,25 @@ type TelegramError = {
   description: string;
 };
 
-// Инициализация бота
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN!, { 
-  polling: false,
-  webHook: false  // Полностью отключить polling и webhook
-});
+// Получаем экземпляр бота из telegram-init (без создания нового с polling)
+// Если бот не инициализирован, создаём временный экземпляр только для отправки сообщений (без polling)
+const getBot = (): TelegramBot | null => {
+  const mainBot = getBotInstance();
+  if (mainBot) {
+    return mainBot;
+  }
+  
+  // Fallback: создаём временный бот только для отправки (без polling)
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return null;
+  }
+  
+  return new TelegramBot(token, { 
+    polling: false, // ВАЖНО: без polling, только для отправки
+    webHook: false
+  });
+};
 
 // Заглушка для Telegram в development
 const sendTelegramStub = async (telegramId: string, message: string, type: string) => {
@@ -74,6 +89,11 @@ export const sendVerificationCode = async (telegramId: string, code: string, typ
 🔒 Не передавайте код третьим лицам
       `;
 
+    const bot = getBot();
+    if (!bot) {
+      throw new Error('Telegram bot не инициализирован');
+    }
+    
     await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
     return { success: true };
   } catch (error) {
@@ -112,6 +132,11 @@ export const sendOrderNotification = async (telegramId: string, orderData: any) 
 Перейдите в приложение для принятия заказа.
     `;
     
+    const bot = getBot();
+    if (!bot) {
+      throw new Error('Telegram bot не инициализирован');
+    }
+    
     await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
     return { success: true };
   } catch (error) {
@@ -143,6 +168,11 @@ export const sendExecutionNotification = async (telegramId: string, executionDat
 
 Ваш баланс пополнен!
     `;
+    
+    const bot = getBot();
+    if (!bot) {
+      throw new Error('Telegram bot не инициализирован');
+    }
     
     await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
     return { success: true };
@@ -176,6 +206,11 @@ ${emoji} **Баланс ${action}!**
 ${type === 'earning' ? 'Поздравляем с успешным выполнением заказа!' : ''}
     `;
     
+    const bot = getBot();
+    if (!bot) {
+      throw new Error('Telegram bot не инициализирован');
+    }
+    
     await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
     return { success: true };
   } catch (error) {
@@ -188,15 +223,83 @@ ${type === 'earning' ? 'Поздравляем с успешным выполн�
   }
 };
 
-// Настройка обработчиков бота
+// Настройка обработчиков бота (УДАЛЕНО - используется telegram-init.ts)
+// Эта функция больше не используется, так как вся логика обработки сообщений
+// перенесена в telegram-init.ts для единого управления ботом
 export const setupTelegramBot = () => {
-  // Полностью отключено для избежания конфликтов
-  console.log('🤖 Telegram бот отключен (polling и webhook отключены)');
+  console.warn('⚠️ setupTelegramBot() устарела - используйте telegram-init.ts');
+  // Функция оставлена для обратной совместимости, но ничего не делает
   return;
+  
+  /* УДАЛЕНО - логика перенесена в telegram-init.ts
+  const bot = getBot();
+  if (!bot) {
+    console.error('❌ Бот не инициализирован');
+    return;
+  }
   
   bot.on('message', async (msg: TelegramMessage) => {
     const chatId = msg.chat.id;
     const text = msg.text;
+    const userId = msg.from?.id.toString();
+    const username = msg.from?.username;
+    
+    if (!text || !userId) return;
+
+    // Обработка ручного ввода кода (6 символов hex)
+    const cleanText = text.trim().toUpperCase();
+    // Проверяем, что это похоже на код (6 символов, 0-9 A-F) и не является командой
+    if (!text.startsWith('/') && /^[0-9A-F]{6}$/.test(cleanText)) {
+      console.log(`[BOT] Получен код вручную: ${cleanText} от пользователя ${userId}`);
+      const tempUserId = findByCode(cleanText);
+
+      if (tempUserId) {
+        markAsAuthorized(tempUserId, userId);
+        
+        await bot.sendMessage(chatId, `
+✅ **Авторизация успешна!**
+
+Вы успешно вошли в MB-TRUST.
+Можете вернуться в браузер.
+        `, { parse_mode: 'Markdown' });
+        console.log(`[BOT] Пользователь ${userId} успешно авторизован (manual code)`);
+      } else {
+        await bot.sendMessage(chatId, `
+❌ **Код не найден**
+
+Проверьте правильность кода или попробуйте сгенерировать новый на сайте.
+        `, { parse_mode: 'Markdown' });
+      }
+      return;
+    }
+
+    // Обработка команды /start link_CODE
+    if (text.startsWith('/start link_')) {
+      const code = text.replace('/start link_', '').trim();
+      console.log(`[BOT] Получен код верификации: ${code} от пользователя ${userId}`);
+
+      const tempUserId = findByCode(code);
+
+      if (tempUserId) {
+        markAsAuthorized(tempUserId, userId);
+        
+        await bot.sendMessage(chatId, `
+✅ **Авторизация успешна!**
+
+Вы успешно вошли в MB-TRUST.
+Можете вернуться в браузер.
+        `, { parse_mode: 'Markdown' });
+        console.log(`[BOT] Пользователь ${userId} успешно авторизован для tempUser ${tempUserId}`);
+      } else {
+        await bot.sendMessage(chatId, `
+❌ **Ошибка авторизации**
+
+Код не найден или истек. Попробуйте снова на сайте.
+        `, { parse_mode: 'Markdown' });
+        console.log(`[BOT] Код ${code} не найден`);
+      }
+      return;
+    }
     
     if (text === '/start') {
       await bot.sendMessage(chatId, `
@@ -208,7 +311,7 @@ export const setupTelegramBot = () => {
 • Информации о балансе
 • Поддержки
 
-Для получения кода верификации обратитесь к администратору.
+Для получения кода верификации используйте кнопку на сайте.
       `);
     }
     
@@ -225,17 +328,17 @@ export const setupTelegramBot = () => {
       `);
     }
   });
-  
-  bot.on('error', (error: TelegramError) => {
-    console.error('Ошибка Telegram бота:', error);
-  });
-  
-  console.log('🤖 Telegram бот запущен и готов к работе');
+  */
 };
 
 // Получение информации о пользователе
 export const getTelegramUserInfo = async (telegramId: string) => {
   try {
+    const bot = getBot();
+    if (!bot) {
+      return null;
+    }
+    
     const user = await bot.getChat(telegramId);
     return {
       id: user.id.toString(),
@@ -254,5 +357,6 @@ export const isValidTelegramId = (telegramId: string): boolean => {
   return /^\d+$/.test(telegramId) && telegramId.length >= 8;
 };
 
-export default bot;
+// Экспортируем функцию для получения бота (для обратной совместимости)
+export default getBot;
 

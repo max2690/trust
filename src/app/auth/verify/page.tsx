@@ -1,15 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function VerifyPage() {
+function VerifyForm() {
   const sp = useSearchParams();
   const userId = sp.get("userId");
   const router = useRouter();
   const [status, setStatus] = useState<"idle"|"pending"|"done"|"error">("idle");
+  const [signupToken, setSignupToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (typeof window !== "undefined") {
+      setSignupToken(sessionStorage.getItem(`signup_token_${userId}`));
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -21,7 +29,11 @@ export default function VerifyPage() {
     
     const t = setInterval(async () => {
       try {
-        const r = await fetch(`/api/users?userId=${userId}`, { cache: "no-store" });
+        const params = new URLSearchParams({ userId });
+        if (signupToken) {
+          params.set("signupToken", signupToken);
+        }
+        const r = await fetch(`/api/users?${params.toString()}`, { cache: "no-store" });
         const data = await r.json();
         
         if (data?.user?.isVerified) {
@@ -38,7 +50,7 @@ export default function VerifyPage() {
     }, 1500);
     
     return () => clearInterval(t);
-  }, [userId, router]);
+  }, [userId, router, signupToken]);
 
   return (
     <div className="min-h-screen bg-mb-black text-mb-white flex items-center justify-center p-6">
@@ -71,6 +83,18 @@ export default function VerifyPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-mb-black text-mb-white flex items-center justify-center">
+        <div className="text-mb-gray">Загрузка...</div>
+      </div>
+    }>
+      <VerifyForm />
+    </Suspense>
   );
 }
 

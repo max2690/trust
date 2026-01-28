@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { OrderCard } from "@/components/business/OrderCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
@@ -23,29 +25,43 @@ interface Execution {
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/auth/signin?role=executor')
+    },
+  });
+  
   const [items, setItems] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/executions?executorId=test-executor-1&status=COMPLETED", { cache: "no-store" });
-        const data = await res.json();
-        setItems(data.executions ?? []);
-      } catch (error) {
-        console.error("Ошибка загрузки истории:", error);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (status === 'authenticated' && session?.user?.id) {
+      (async () => {
+        try {
+          const res = await fetch("/api/executions?status=COMPLETED", { cache: "no-store" });
+          const data = await res.json();
+          setItems(data.executions ?? []);
+        } catch (error) {
+          console.error("Ошибка загрузки истории:", error);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [status, session]);
 
-  if (loading) {
+  if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-mb-black flex items-center justify-center">
         <div className="text-white text-xl">Загрузка…</div>
       </div>
     );
+  }
+  
+  if (status === 'unauthenticated') {
+    return null;
   }
 
   return (

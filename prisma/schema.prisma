@@ -154,6 +154,7 @@ model Order {
   title         String
   description   String
   targetAudience String?
+  targetUrl     String?     // Ссылка на ресурс (пост, сторис и т.д.)
   budget        Float
   reward        Float       // Сумма для исполнителя
   totalReward   Float?      // Общая сумма кампании

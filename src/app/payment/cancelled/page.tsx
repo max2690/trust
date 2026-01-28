@@ -23,7 +23,7 @@ export default function PaymentCancelledPage() {
           </p>
           <div className="space-y-2">
             <Button 
-              onClick={() => router.push('/customer/dashboard')}
+              onClick={() => router.push('/dashboard/customer')}
               className="w-full"
             >
               Вернуться в личный кабинет

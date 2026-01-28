@@ -55,15 +55,20 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Если выполнение одобрено, обновляем счетчик
+    // Если выполнение одобрено, обновляем счетчик и проверяем завершение заказа
     if (verificationResult.approved) {
       // Обновляем счетчик выполненных заказов
-      await prisma.order.update({
+      const updatedOrder = await prisma.order.update({
         where: { id: execution.orderId },
         data: {
           completedCount: {
             increment: 1
           }
+        },
+        select: {
+          id: true,
+          quantity: true,
+          completedCount: true
         }
       });
 
@@ -76,6 +81,17 @@ export async function POST(request: NextRequest) {
           }
         }
       });
+
+      // Проверяем, все ли выполнения завершены (completedCount >= quantity)
+      if (updatedOrder.completedCount >= updatedOrder.quantity) {
+        await prisma.order.update({
+          where: { id: execution.orderId },
+          data: { 
+            status: 'COMPLETED'
+          }
+        });
+        console.log(`✅ Заказ ${execution.orderId} полностью завершён (${updatedOrder.completedCount}/${updatedOrder.quantity})`);
+      }
     }
 
     return NextResponse.json({
