@@ -5,10 +5,14 @@ import OpenAI from 'openai';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Инициализация OpenAI клиента
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || undefined,
-});
+// Ленивая инициализация OpenAI клиента (только при необходимости)
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || apiKey === 'your_openai_api_key_here') {
+    return null;
+  }
+  return new OpenAI({ apiKey });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -109,16 +113,17 @@ export async function POST(request: NextRequest) {
 // AI верификация через OpenAI Vision API
 async function performAIVerification(imageUrl: string, order: { description: string }) {
   try {
-    // Если OpenAI API ключ не настроен, используем заглушку
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-      console.log('⚠️ OpenAI API ключ не настроен, используем заглушку');
-      return await performStubVerification();
-    }
-
     // Получаем полный URL изображения
     const fullImageUrl = imageUrl.startsWith('http') 
       ? imageUrl 
       : `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}${imageUrl}`;
+
+    // Получаем клиент OpenAI (ленивая инициализация)
+    const openai = getOpenAIClient();
+    if (!openai) {
+      console.log('⚠️ OpenAI API ключ не настроен, используем заглушку');
+      return await performStubVerification();
+    }
 
     // Запрос к OpenAI Vision API
     const response = await openai.chat.completions.create({
