@@ -188,7 +188,7 @@ export async function createOrderInDB(data: {
       deadline: data.deadline,
       campaignType: data.campaignType as 'SINGLE' | 'WEEKLY' | 'BIWEEKLY',
       totalQuantity: data.totalQuantity,
-      dailySchedule: (data.dailySchedule ?? undefined) as Prisma.InputJsonValue | undefined,
+      dailySchedule: data.dailySchedule ? (data.dailySchedule as Prisma.InputJsonValue) : Prisma.JsonNull,
       autoDistribution: data.autoDistribution,
       refundOnFailure: data.refundOnFailure,
       refundDeadline: data.refundDeadline,
@@ -269,7 +269,7 @@ export async function createOrder(orderData: CreateOrderData) {
       deadline: deadlineDate,
       campaignType: orderData.campaignType || 'SINGLE',
       totalQuantity: quantity > 1 ? quantity : (orderData.totalQuantity || 1),
-      dailySchedule: (quantity > 1 ? undefined : (orderData.dailyDistribution || undefined)) as Prisma.InputJsonValue | undefined,
+      dailySchedule: quantity > 1 ? null : (orderData.dailyDistribution || null),
       autoDistribution: orderData.autoDistribution ?? true,
       refundOnFailure: orderData.refundOnFailure ?? true,
       refundDeadline: orderData.refundDeadline
