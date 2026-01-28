@@ -25,7 +25,7 @@ export const createOrderSchema = z.object({
       message: 'Минимум 1 исполнение',
     }),
   socialNetwork: z.enum(['INSTAGRAM', 'TELEGRAM', 'VK', 'YOUTUBE', 'TIKTOK', 'WHATSAPP', 'FACEBOOK'], {
-    required_error: 'Выберите социальную сеть',
+    errorMap: () => ({ message: 'Выберите социальную сеть' }),
   }),
   deadline: z
     .string()
