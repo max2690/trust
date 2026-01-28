@@ -24,9 +24,7 @@ export const createOrderSchema = z.object({
     .refine((val) => !isNaN(Number(val)) && Number(val) >= 1, {
       message: 'Минимум 1 исполнение',
     }),
-  socialNetwork: z.enum(['INSTAGRAM', 'TELEGRAM', 'VK', 'YOUTUBE', 'TIKTOK', 'WHATSAPP', 'FACEBOOK'], {
-    errorMap: () => ({ message: 'Выберите социальную сеть' }),
-  }),
+  socialNetwork: z.enum(['INSTAGRAM', 'TELEGRAM', 'VK', 'YOUTUBE', 'TIKTOK', 'WHATSAPP', 'FACEBOOK']),
   deadline: z
     .string()
     .refine((val) => new Date(val) > new Date(Date.now() + 3600000), {
