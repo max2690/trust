@@ -635,7 +635,7 @@ export const initializeTelegramBot = async () => {
         // Лучше полагаться на контекст: если юзер есть -> Auth, если нет -> Reg?
         // НО: Auth code лежит в memory, Reg code в DB.
         
-        if (/^[0-9A-F]{6}$/.test(code)) {
+        if (code && /^[0-9A-F]{6}$/.test(code)) {
            // Проверим в memory (Auth)
            const isAuth = !!findByCode(code)
            if (isAuth) isAuthCode = true
