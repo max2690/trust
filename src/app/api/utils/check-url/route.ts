@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         method: 'HEAD',
         redirect: 'follow',
         signal: controller.signal,
-        // @ts-ignore - Next.js fetch extension
+        // @ts-expect-error - Next.js fetch extension
         duplex: 'half', 
         // В Next.js/Node fetch нет опции отключения SSL проверки напрямую через rejectUnauthorized в options
         // Но мы можем отловить ошибку сертификата и попробовать считать ссылку "валидной" если это просто проблема SSL,
@@ -84,11 +84,12 @@ export async function POST(req: NextRequest) {
         },
         { status: 200 }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeout);
       
       // Логируем только реальные сетевые ошибки, а не ошибки валидации
-      const errorCode = error?.code || error?.cause?.code;
+      const errorObj = error as { code?: string; cause?: { code?: string }; message?: string };
+      const errorCode = errorObj?.code || errorObj?.cause?.code;
       
       // Игнорируем ошибки SSL для "самоподписанных" или проблемных сертификатов
       // Считаем, что если домен резолвится и отвечает (пусть и с ошибкой SSL), то ссылка "живая"
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
       console.error('[API /utils/check-url] Validation error:', {
         url: validation.normalized,
-        error: error.message,
+        error: errorObj?.message || 'Unknown error',
         code: errorCode
       });
 
