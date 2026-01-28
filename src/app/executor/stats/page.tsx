@@ -70,7 +70,8 @@ export default function StatsPage() {
     );
   }
   
-  if (status === 'unauthenticated') {
+  // useSession({ required: true }) гарантирует, что status === 'authenticated' здесь
+  if (!session?.user) {
     return null;
   }
 
