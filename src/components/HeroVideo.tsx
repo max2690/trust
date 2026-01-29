@@ -2,76 +2,82 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+const VIDEO_SRC = '/videos/mb-trust-hero-video.mp4';
+const POSTER_SRC = '/videos/poster.jpg';
+
 export default function HeroVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  // По умолчанию false: сначала показываем постер, потом на десктопе включаем видео (избегаем загрузки видео на мобильных)
+  const [useVideo, setUseVideo] = useState(false);
 
   useEffect(() => {
+    const checkMobile = () => {
+      const isMobile =
+        typeof window !== 'undefined' &&
+        (window.innerWidth < 768 ||
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      setUseVideo(!isMobile);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!useVideo) return;
+
     const video = videoRef.current;
     if (!video) return;
 
-    // Обработка ошибок загрузки
-    const handleError = (e: Event) => {
-      console.warn('Hero видео не загружено:', video.error?.message || 'Unknown error');
-      console.warn('Video error code:', video.error?.code);
+    const handleError = () => {
       setHasError(true);
-      setIsLoading(false);
     };
 
-    // Видео готово к воспроизведению
     const handleCanPlay = () => {
-      console.log('Hero видео успешно загружено');
-      setIsLoading(false);
       setHasError(false);
-    };
-
-    // Видео начало загружаться
-    const handleLoadStart = () => {
-      console.log('Hero видео начало загрузку');
-      setIsLoading(true);
-    };
-
-    // Видео загружено
-    const handleLoadedData = () => {
-      console.log('Hero видео данные загружены');
-      setIsLoading(false);
     };
 
     video.addEventListener('error', handleError);
     video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('loadstart', handleLoadStart);
-    video.addEventListener('loadeddata', handleLoadedData);
-
-    // Попытка загрузить видео
     video.load();
 
     return () => {
       video.removeEventListener('error', handleError);
       video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('loadstart', handleLoadStart);
-      video.removeEventListener('loadeddata', handleLoadedData);
     };
-  }, []);
+  }, [useVideo]);
 
   return (
     <div className="absolute inset-0 z-0">
-      {!hasError && (
+      {/* На мобильных или при ошибке — только постер/фон */}
+      {useVideo && !hasError ? (
         <video
           ref={videoRef}
-          className="object-cover absolute inset-0 w-full h-full opacity-30"
+          className="object-cover absolute inset-0 w-full h-full min-h-full min-w-full opacity-30"
           autoPlay
           muted
           loop
           playsInline
           preload="auto"
-          poster="/videos/poster.jpg"
+          poster={POSTER_SRC}
+          style={{ objectFit: 'cover' }}
+          aria-hidden
         >
-          <source src="/videos/mb-trust-hero-video.mp4" type="video/mp4" />
+          <source src={VIDEO_SRC} type="video/mp4" />
         </video>
+      ) : (
+        <div
+          className="absolute inset-0 w-full h-full bg-[#0B0B0F] bg-cover bg-center"
+          style={{
+            backgroundImage: POSTER_SRC ? `url(${POSTER_SRC})` : undefined,
+          }}
+          aria-hidden
+        />
       )}
       {/* Overlay для затемнения */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0F]/80 via-[#0B0B0F]/60 to-[#0B0B0F]/80"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0F]/80 via-[#0B0B0F]/60 to-[#0B0B0F]/80 pointer-events-none" />
     </div>
   );
 }
