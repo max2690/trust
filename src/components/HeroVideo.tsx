@@ -56,19 +56,20 @@ export default function HeroVideo() {
 
   return (
     <div className="absolute inset-0 z-0">
-      <video
-        ref={videoRef}
-        className="object-cover absolute inset-0 w-full h-full opacity-30"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        poster="/videos/poster.jpg"
-        style={{ display: hasError ? 'none' : 'block' }}
-      >
-        <source src="/videos/mb-trust-hero-video.mp4" type="video/mp4" />
-      </video>
+      {!hasError && (
+        <video
+          ref={videoRef}
+          className="object-cover absolute inset-0 w-full h-full opacity-30"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/videos/poster.jpg"
+        >
+          <source src="/videos/mb-trust-hero-video.mp4" type="video/mp4" />
+        </video>
+      )}
       {/* Overlay для затемнения */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0F]/80 via-[#0B0B0F]/60 to-[#0B0B0F]/80"></div>
     </div>

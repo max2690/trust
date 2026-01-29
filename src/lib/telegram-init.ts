@@ -516,7 +516,13 @@ export const initializeTelegramBot = async () => {
 
   try {
     console.log('🚀 Создание нового экземпляра Telegram бота...')
-    const bot = new TelegramBot(token, { polling: true })
+    // На Vercel используем webhook, не polling (serverless не поддерживает long polling)
+    // Polling используется только локально или на обычных серверах
+    const isVercel = !!process.env.VERCEL;
+    const bot = new TelegramBot(token, { 
+      polling: !isVercel, // Polling только если не Vercel
+      webHook: false 
+    })
     botInstance = bot
     isInitialized = true
 
